@@ -5,10 +5,9 @@ int main() {
 
     // put your setup code here, to run once:
     pc.printf("Hello world\n");
-    float z,yaw;
-    int gyro_z;
 
     write_setting_byte(power_mgmt_1,0);
+    setting_gyro_scale();
 
     init_offset();
     //pc.printf("%d",gyro_avr);
@@ -16,11 +15,19 @@ int main() {
     while(1) {
         t.start();
         read_word(&roll_cmd, &gyro_z);
+        debug_z = gyro_z;
         gyro_z = gyro_z - gyro_avr ;
-        z = ((gyro_z / 32767.0) * 250.0) * (PI/180);
+        z = ((gyro_z / 32767.0) * 250.0) * (180/PI);
         t.stop();
         yaw += -t.read() * z;
-        pc.printf(" Yaw: %f time : %f\n",z,t.read());
+
+        if (yaw < 0){
+          yaw += 360;
+        } else if(yaw > 360){
+          yaw -= 360;
+        }
+
+        pc.printf(" Yaw: %f time : %f\n",yaw,t.read());
         t.reset();
     }
 }
@@ -52,15 +59,16 @@ void read_word(char* cmd,int* data){
   *data = (int16_t)((high << 8) | low);
 }
 
-void read_word_2c(char*cmd, float*data){
-  int val;
-  read_word(cmd,&val);
+void setting_gyro_scale(){
+  char c,cmd ;
+  cmd = GYRO_CONFIG;
+  read_byte(&cmd, &c);
+  write_setting_byte(GYRO_CONFIG, c & ~0xE0); // Clear self-test bits [7:5]
+  write_setting_byte(GYRO_CONFIG, c & ~0x18); // Clear AFS bits [4:3]
+  write_setting_byte(GYRO_CONFIG, c | 0 << 3); // Set full scale range for the gyro
 
-  if (val >= 0x8000){
-    *data = -((65535 -val) + 1);
-  } else {
-    *data = val;
-  }
+  write_setting_byte(INT_PIN_CFG, 0x22);
+  write_setting_byte(INT_ENABLE, 0x01);
 }
 
 void init_offset(){
@@ -73,4 +81,23 @@ void init_offset(){
   }
 
   gyro_avr = sum_gyro/500.0;
+}
+
+void yaw_calculator(){
+  t.start();
+  read_word(&roll_cmd, &gyro_z);
+  debug_z = gyro_z;
+  gyro_z = gyro_z - gyro_avr ;
+  z = ((gyro_z / 32767.0) * 250.0);
+  t.stop();
+  yaw += -t.read() * z;
+
+  if (yaw < 0){
+    yaw += 360;
+  } else if(yaw > 360){
+    yaw -= 360;
+  }
+
+  pc.printf(" Yaw: %f time : %f\n",yaw,t.read());
+  t.reset();
 }

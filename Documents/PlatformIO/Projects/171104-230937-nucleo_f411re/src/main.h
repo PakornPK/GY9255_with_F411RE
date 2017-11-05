@@ -2,6 +2,10 @@
 
 #define PI 3.14159265358979323846
 
+#define GYRO_CONFIG 0x1B
+#define INT_PIN_CFG 0x37
+#define INT_ENABLE  0x38
+
 I2C i2c(PB_9, PB_8);
 Serial pc(USBTX, USBRX);
 
@@ -12,6 +16,8 @@ Timer t;
 //GLOBAL VARIABLE
 float gyro_avr;
 char roll_cmd = 0x47;
+float z,yaw;
+int gyro_z,debug_z;
 
 
 const int power_mgmt_1 = 0x6B;
@@ -22,5 +28,6 @@ void read_byte(char* cmd, char* data);
 void read_word(char* cmd,int* data);
 void read_word_2c(char*cmd, float*data);
 
+void setting_gyro_scale();
 void init_offset();
 void yaw_calculator();
