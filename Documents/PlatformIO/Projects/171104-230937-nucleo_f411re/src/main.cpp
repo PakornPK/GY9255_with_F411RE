@@ -2,33 +2,23 @@
 
 int main() {
 
-
     // put your setup code here, to run once:
     pc.printf("Hello world\n");
+    led1 = 1;
 
     write_setting_byte(power_mgmt_1,0);
     setting_gyro_scale();
 
     init_offset();
-    //pc.printf("%d",gyro_avr);
+    t.start();
+    //pc.attach(&yaw_calculator, Serial::RxIrq);
+    //process_yaw.attach(&yaw_calculator, 0.02);
 
     while(1) {
-        t.start();
-        read_word(&roll_cmd, &gyro_z);
-        debug_z = gyro_z;
-        gyro_z = gyro_z - gyro_avr ;
-        z = ((gyro_z / 32767.0) * 250.0) * (180/PI);
-        t.stop();
-        yaw += -t.read() * z;
-
-        if (yaw < 0){
-          yaw += 360;
-        } else if(yaw > 360){
-          yaw -= 360;
+        if(t.read_ms() > 100){
+          yaw_calculator();
+          t.reset();
         }
-
-        pc.printf(" Yaw: %f time : %f\n",yaw,t.read());
-        t.reset();
     }
 }
 
@@ -42,12 +32,14 @@ void write_setting_byte(char sub_adr, char data){
 
 void read_byte(char* cmd, char* data){
   //CMD & DATA only one byte
-
   i2c.write(address, cmd, 1, 1);
   i2c.read(address, data, 1, 0);
 }
 
 void read_word(char* cmd,int* data){
+  while(state != false){pc.printf("OMG BUG !\n");}
+  state = true;
+
   char high;
   char low;
 
@@ -57,6 +49,8 @@ void read_word(char* cmd,int* data){
   (*cmd--);
 
   *data = (int16_t)((high << 8) | low);
+  //pc.printf("Debug : %d \n",*data); //for debug why I2C cann't work in timerinterrupt
+  state = false;
 }
 
 void setting_gyro_scale(){
@@ -84,13 +78,14 @@ void init_offset(){
 }
 
 void yaw_calculator(){
-  t.start();
+  t_yaw.start();
   read_word(&roll_cmd, &gyro_z);
   debug_z = gyro_z;
   gyro_z = gyro_z - gyro_avr ;
-  z = ((gyro_z / 32767.0) * 250.0);
-  t.stop();
-  yaw += -t.read() * z;
+  z = ((gyro_z / 32767.0) * 250.0) * (180/PI);
+  t_yaw.stop();
+  yaw += -t_yaw.read() * z;
+  //yaw += -0.02*z;
 
   if (yaw < 0){
     yaw += 360;
@@ -98,6 +93,7 @@ void yaw_calculator(){
     yaw -= 360;
   }
 
-  pc.printf(" Yaw: %f time : %f\n",yaw,t.read());
-  t.reset();
+  pc.printf(" Yaw: %f\n",yaw);
+  //led1 = ~led1;
+  t_yaw.reset();
 }
